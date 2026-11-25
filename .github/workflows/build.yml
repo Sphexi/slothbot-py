@@ -5,21 +5,33 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '0 6 * * 1'
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up JDK
-      uses: actions/setup-java@v1
-      with:
-        java-version: 11
-    - name: Cache local Maven repository
-      uses: actions/cache@v2
-      with:
-        path: ~/.m2/repository
-        key: maven-${{ hashFiles('build.gradle') }}
-        restore-keys: maven-
-    - name: Build
-      run: ./gradlew build
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+    - name: Install dependencies
+      run: uv sync --locked
+    - name: Lint
+      run: uv run ruff check .
+    - name: Check formatting
+      run: uv run ruff format --check .
+    - name: Test
+      run: uv run pytest
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+    - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+    - name: Export locked dependencies
+      run: uv export --format requirements-txt --no-dev --no-emit-project > requirements.txt
+    - name: Audit for known vulnerabilities
+      run: uvx pip-audit==2.9.0 --strict -r requirements.txt
